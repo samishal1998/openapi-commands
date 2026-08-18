@@ -19,6 +19,7 @@ import (
 	"github.com/d3servelabs/namefi-astra/projects/oascmd"
 	"github.com/d3servelabs/namefi-astra/projects/oascmd/gen"
 	"github.com/d3servelabs/namefi-astra/projects/oascmd/gen/goldenpkg"
+	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
 )
 
 const goldenPath = "goldenpkg/generated.go"
@@ -356,5 +357,95 @@ func TestGeneratedSkipAndHidden(t *testing.T) {
 	}
 	if !found {
 		t.Error("hidden debug command not found or not hidden")
+	}
+}
+
+// TestLockComputedFromPostHookModel proves the lock describes what was
+// actually generated: both hooks mutate the model, and the lock must show
+// the mutated form, not the spec's.
+func TestLockComputedFromPostHookModel(t *testing.T) {
+	opts := gen.Options{
+		PackageName: "goldenpkg",
+		Hooks: oascmd.Hooks{
+			OnReadOperation: func(op *oascmd.Operation) error {
+				if op.ID == "deletePet" {
+					return oascmd.SkipOperation
+				}
+				if op.ID == "listPets" {
+					op.Summary = "hook-rewritten summary"
+					op.Params = append(op.Params, oascmd.Param{
+						Name: "hook-flag", In: "query",
+						Type: oascmd.Type{Kind: oascmd.KindString},
+					})
+				}
+				return nil
+			},
+		},
+		OnEmitOperation: func(m *gen.CommandModel) error {
+			if m.Op.ID == "listPets" {
+				m.FuncName = "NewHookRenamedCommand"
+				m.Path = oascmd.CommandPath{Groups: []string{"hooked"}, Name: "ls"}
+			}
+			return nil
+		},
+	}
+	_, models, err := gen.GenerateWithModels(specData(t), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := lock.Compute(gen.LockModels(models))
+
+	entry, ok := l.Operations["listPets"]
+	if !ok {
+		t.Fatal("listPets missing from the lock")
+	}
+	if entry.FuncName != "NewHookRenamedCommand" {
+		t.Errorf("funcName = %q, want the hook-assigned name", entry.FuncName)
+	}
+	if entry.Command != "hooked ls" {
+		t.Errorf("command = %q, want the hook-assigned path", entry.Command)
+	}
+	if entry.Summary != "hook-rewritten summary" {
+		t.Errorf("summary = %q, want the hook-rewritten one", entry.Summary)
+	}
+	var found bool
+	for _, f := range entry.Flags {
+		if f.Name == "hook-flag" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("the hook-added flag is missing: %+v", entry.Flags)
+	}
+	if _, ok := l.Operations["deletePet"]; ok {
+		t.Error("a vetoed operation must not appear in the lock")
+	}
+
+	// Without hooks the same spec must produce a different surface, so
+	// the assertions above are meaningful.
+	_, plainModels, err := gen.GenerateWithModels(specData(t), gen.Options{PackageName: "goldenpkg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := lock.Compute(gen.LockModels(plainModels))
+	if lock.Diff(plain, l).Severity() != lock.SeverityBreaking {
+		t.Error("expected the hooked surface to differ from the plain one")
+	}
+}
+
+// TestGenerateFromModelsMatchesGenerate checks the additive-only emit path
+// produces the same source as the normal path when nothing is substituted.
+func TestGenerateFromModelsMatchesGenerate(t *testing.T) {
+	opts := gen.Options{PackageName: "goldenpkg"}
+	want, models, err := gen.GenerateWithModels(specData(t), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := gen.GenerateFromModels(specData(t), opts, models)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("GenerateFromModels output differs from Generate")
 	}
 }

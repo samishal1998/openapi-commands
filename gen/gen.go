@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
 	"github.com/d3servelabs/namefi-astra/projects/oascmd/spec"
 )
 
@@ -47,12 +48,21 @@ type Options struct {
 // Generate parses an OpenAPI 3.0/3.1 document and returns a gofmt-formatted
 // Go source file containing component structs and command constructors.
 func Generate(specData []byte, opts Options) ([]byte, error) {
+	source, _, err := GenerateWithModels(specData, opts)
+	return source, err
+}
+
+// GenerateWithModels is Generate plus the post-hook command models it
+// emitted, in emission order. The models are what the lock file records:
+// they reflect every OnReadOperation and OnEmitOperation mutation, so they
+// describe what was actually generated rather than what the spec said.
+func GenerateWithModels(specData []byte, opts Options) ([]byte, []CommandModel, error) {
 	if opts.PackageName == "" {
-		return nil, fmt.Errorf("gen: package name is required")
+		return nil, nil, fmt.Errorf("gen: package name is required")
 	}
 	ops, schemas, err := spec.LoadWithSchemas(specData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	nameFunc := opts.NameFunc
 	if nameFunc == nil {
@@ -65,7 +75,7 @@ func Generate(specData []byte, opts Options) ([]byte, error) {
 		op := ops[i]
 		keep, err := opts.Hooks.ApplyRead(&op)
 		if err != nil {
-			return nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
+			return nil, nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
 		}
 		if !keep {
 			continue
@@ -81,7 +91,7 @@ func Generate(specData []byte, opts Options) ([]byte, error) {
 				if err == oascmd.SkipOperation {
 					continue
 				}
-				return nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
+				return nil, nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
 			}
 		}
 		usedNames[model.FuncName]++
@@ -95,9 +105,46 @@ func Generate(specData []byte, opts Options) ([]byte, error) {
 	emitFile(&buf, opts.PackageName, schemas, models)
 	formatted, err := format.Source(buf.Bytes())
 	if err != nil {
+		return nil, nil, fmt.Errorf("gen: format emitted source: %w\n%s", err, buf.String())
+	}
+	return formatted, models, nil
+}
+
+// GenerateFromModels emits source for an explicit set of command models,
+// taking only the component schemas from the spec. It backs the
+// additive-only drift policy, which replaces some freshly derived models
+// with the ones recorded in the lock file.
+func GenerateFromModels(specData []byte, opts Options, models []CommandModel) ([]byte, error) {
+	if opts.PackageName == "" {
+		return nil, fmt.Errorf("gen: package name is required")
+	}
+	_, schemas, err := spec.LoadWithSchemas(specData)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	emitFile(&buf, opts.PackageName, schemas, models)
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
 		return nil, fmt.Errorf("gen: format emitted source: %w\n%s", err, buf.String())
 	}
 	return formatted, nil
+}
+
+// ModelFromLock converts a lock model back into a command model, so a
+// previously generated operation can be emitted unchanged.
+func ModelFromLock(m lock.Model) CommandModel {
+	return CommandModel{FuncName: m.FuncName, Path: m.Path, Op: m.Op}
+}
+
+// LockModels converts emitted command models to the lock package's model
+// type. It is a small adapter so gen does not depend on lock.
+func LockModels(models []CommandModel) []lock.Model {
+	out := make([]lock.Model, 0, len(models))
+	for _, m := range models {
+		out = append(out, lock.Model{FuncName: m.FuncName, Path: m.Path, Op: m.Op})
+	}
+	return out
 }
 
 func emitFile(buf *bytes.Buffer, pkg string, schemas []spec.ComponentSchema, models []CommandModel) {

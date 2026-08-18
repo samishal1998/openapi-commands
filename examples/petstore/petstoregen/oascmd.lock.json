@@ -1,0 +1,205 @@
+{
+  "lockVersion": 1,
+  "generatorVersion": "oascmd-gen/1",
+  "specDigest": "43d83521ea2fba0e330aca8bc377c5e68067d45d9727fa44fefa9df9d2ed06a4",
+  "operations": {
+    "PUT /untagged/anon": {
+      "method": "PUT",
+      "path": "/untagged/anon",
+      "command": "untagged anon put",
+      "funcName": "NewUntaggedAnonPutCommand",
+      "summary": "No operationId, no tags",
+      "ext": {},
+      "digest": "8f700258c62acef4"
+    },
+    "createPet": {
+      "operationId": "createPet",
+      "method": "POST",
+      "path": "/pets",
+      "command": "pets create",
+      "funcName": "NewPetsCreateCommand",
+      "summary": "Create a pet",
+      "flags": [
+        {
+          "name": "age",
+          "source": "body",
+          "type": "int"
+        },
+        {
+          "name": "kind",
+          "source": "body",
+          "type": "string",
+          "enum": [
+            "dog",
+            "cat",
+            "bird"
+          ]
+        },
+        {
+          "name": "name",
+          "source": "body",
+          "type": "string",
+          "required": true,
+          "description": "The pet's name"
+        },
+        {
+          "name": "nicknames",
+          "source": "body",
+          "type": "[]string"
+        },
+        {
+          "name": "vaccinated",
+          "source": "body",
+          "type": "bool"
+        },
+        {
+          "name": "weight",
+          "source": "body",
+          "type": "number"
+        }
+      ],
+      "body": {
+        "flat": true,
+        "required": true
+      },
+      "ext": {},
+      "digest": "22e7a517ae2fec1f"
+    },
+    "debugDump": {
+      "operationId": "debugDump",
+      "method": "GET",
+      "path": "/internal/debug",
+      "command": "internal dump debug",
+      "funcName": "NewInternalDumpDebugCommand",
+      "summary": "Hidden debug dump",
+      "ext": {
+        "hidden": true
+      },
+      "digest": "f388f333729eade8"
+    },
+    "deletePet": {
+      "operationId": "deletePet",
+      "method": "DELETE",
+      "path": "/pets/{petId}",
+      "command": "pets delete",
+      "funcName": "NewPetsDeleteCommand",
+      "summary": "Delete a pet",
+      "flags": [
+        {
+          "name": "pet-id",
+          "apiName": "petId",
+          "source": "path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "ext": {
+        "confirm": true
+      },
+      "digest": "7181b16a0077b0e3"
+    },
+    "getDnsRecords": {
+      "operationId": "getDnsRecords",
+      "method": "GET",
+      "path": "/dns/records",
+      "command": "dns records get",
+      "funcName": "NewDNSRecordsGetCommand",
+      "summary": "List DNS records",
+      "flags": [
+        {
+          "name": "domain",
+          "source": "query",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "ext": {},
+      "digest": "43d16cfbcd138f14"
+    },
+    "getPet": {
+      "operationId": "getPet",
+      "method": "GET",
+      "path": "/pets/{petId}",
+      "command": "pets get",
+      "funcName": "NewPetsGetCommand",
+      "summary": "Get a pet",
+      "flags": [
+        {
+          "name": "pet-id",
+          "apiName": "petId",
+          "source": "path",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "ext": {},
+      "digest": "db96c24bdd845f5c"
+    },
+    "legacyPing": {
+      "operationId": "legacyPing",
+      "method": "GET",
+      "path": "/legacy/ping",
+      "command": "legacy ping",
+      "funcName": "NewLegacyPingCommand",
+      "summary": "Deprecated ping",
+      "deprecated": true,
+      "ext": {},
+      "digest": "24a9516742c92f9c"
+    },
+    "listPets": {
+      "operationId": "listPets",
+      "method": "GET",
+      "path": "/pets",
+      "command": "pets list",
+      "funcName": "NewPetsListCommand",
+      "summary": "List pets",
+      "flags": [
+        {
+          "name": "limit",
+          "source": "query",
+          "type": "int",
+          "default": "20",
+          "description": "Max results per page"
+        },
+        {
+          "name": "long",
+          "apiName": "verbose",
+          "source": "query",
+          "type": "bool",
+          "shorthand": "l"
+        },
+        {
+          "name": "status",
+          "source": "query",
+          "type": "string",
+          "enum": [
+            "available",
+            "pending",
+            "sold"
+          ]
+        },
+        {
+          "name": "tags",
+          "source": "query",
+          "type": "[]string",
+          "description": "Filter by tags"
+        }
+      ],
+      "ext": {},
+      "digest": "5ee4c2e4bfe7c91c"
+    },
+    "someWeirdInternalName": {
+      "operationId": "someWeirdInternalName",
+      "method": "GET",
+      "path": "/renamed",
+      "command": "tools renamed thing",
+      "funcName": "NewToolsRenamedThingCommand",
+      "summary": "Renamed via x-cli-name",
+      "ext": {
+        "name": "renamed thing",
+        "group": "tools"
+      },
+      "digest": "e1e374c98b39a93a"
+    }
+  }
+}

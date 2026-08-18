@@ -12,7 +12,12 @@
 //	go generate ./examples/petstore
 //	go run ./examples/petstore typed pets list --limit 5
 //
-//go:generate go run github.com/d3servelabs/namefi-astra/projects/oascmd/cmd/oascmd-gen -spec ../../testdata/petstore.yaml -package petstoregen -out petstoregen/generated.go
+// The generator also maintains petstoregen/oascmd.lock.json, the record of
+// the generated CLI surface. Re-running go:generate after a spec change
+// regenerates only when the change is safe; a breaking change is refused
+// with a report (see the README for the severity ladder and policies).
+//
+//go:generate go run github.com/d3servelabs/namefi-astra/projects/oascmd/cmd/oascmd-gen -spec ../../testdata/petstore.yaml -package petstoregen -out petstoregen/generated.go -on-drift auto
 package main
 
 import (

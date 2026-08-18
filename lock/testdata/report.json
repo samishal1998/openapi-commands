@@ -1,0 +1,31 @@
+{
+  "severity": "breaking",
+  "generatorChanged": false,
+  "oldGenerator": "oascmd-gen/1",
+  "newGenerator": "oascmd-gen/1",
+  "operations": [
+    {
+      "key": "listPets",
+      "kind": "modified",
+      "command": "pets list",
+      "method": "GET",
+      "path": "/pets",
+      "severity": "breaking",
+      "changes": [
+        {
+          "field": "flag --limit type",
+          "old": "int",
+          "new": "string",
+          "severity": "breaking",
+          "detail": "the value is parsed differently now; values that used to be accepted may be rejected"
+        },
+        {
+          "field": "flag --tag",
+          "new": "string",
+          "severity": "additive",
+          "detail": "a new optional flag; existing invocations keep working"
+        }
+      ]
+    }
+  ]
+}
