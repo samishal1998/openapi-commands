@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: Petstore Fixture
+  version: 1.0.0
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      tags: [pets]
+      summary: List pets
+      parameters:
+        - name: limit
+          in: query
+          description: Max results per page
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, pending, sold]
+        - name: tags
+          in: query
+          description: Filter by tags
+          schema:
+            type: array
+            items:
+              type: string
+        - name: verbose
+          in: query
+          x-cli-flag-name: long
+          x-cli-shorthand: l
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: createPet
+      tags: [pets]
+      summary: Create a pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: The pet's name
+                kind:
+                  type: string
+                  enum: [dog, cat, bird]
+                age:
+                  type: integer
+                weight:
+                  type: number
+                vaccinated:
+                  type: boolean
+                nicknames:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Created
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getPet
+      tags: [pets]
+      summary: Get a pet
+      responses:
+        "200":
+          description: OK
+    delete:
+      operationId: deletePet
+      tags: [pets]
+      summary: Delete a pet
+      x-cli-confirm: true
+      responses:
+        "204":
+          description: Deleted
+  /dns/records:
+    get:
+      operationId: getDnsRecords
+      tags: [dns]
+      summary: List DNS records
+      parameters:
+        - name: domain
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /legacy/ping:
+    get:
+      operationId: legacyPing
+      tags: [legacy]
+      deprecated: true
+      summary: Deprecated ping
+      responses:
+        "200":
+          description: OK
+  /internal/debug:
+    get:
+      operationId: debugDump
+      tags: [internal]
+      x-cli-hidden: true
+      summary: Hidden debug dump
+      responses:
+        "200":
+          description: OK
+  /internal/skip-me:
+    get:
+      operationId: skippedOp
+      tags: [internal]
+      x-cli-skip: true
+      summary: Skipped operation
+      responses:
+        "200":
+          description: OK
+  /renamed:
+    get:
+      operationId: someWeirdInternalName
+      tags: [misc]
+      x-cli-group: tools
+      x-cli-name: renamed thing
+      summary: Renamed via x-cli-name
+      responses:
+        "200":
+          description: OK
+  /untagged/anon:
+    put:
+      summary: No operationId, no tags
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    Pet:
+      type: object
+      description: A pet in the store.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+        age:
+          type: integer
+        vaccinated:
+          type: boolean
+        nicknames:
+          type: array
+          items:
+            type: string
+        owner:
+          $ref: "#/components/schemas/Owner"
+        metadata:
+          type: object
+          properties:
+            note:
+              type: string
+    Owner:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        pets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pet"
