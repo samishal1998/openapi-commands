@@ -80,6 +80,9 @@ func GenerateWithModels(specData []byte, opts Options) ([]byte, []CommandModel, 
 		if !keep {
 			continue
 		}
+		if err := opts.Hooks.ApplyBody(&op); err != nil {
+			return nil, nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
+		}
 		path := nameFunc(op)
 		model := CommandModel{
 			FuncName: "New" + pascalWords(append(append([]string{}, path.Groups...), path.Name)) + "Command",
@@ -484,7 +487,15 @@ func emitCommand(buf *bytes.Buffer, m *CommandModel) {
 		fmt.Fprintf(buf, "\t\tcase flagData != \"\":\n")
 		fmt.Fprintf(buf, "\t\t\treq.RawBody = []byte(flagData)\n")
 		fmt.Fprintf(buf, "\t\tcase len(body) > 0:\n")
-		fmt.Fprintf(buf, "\t\t\treq.Body = body\n")
+		if len(op.Body.WrapPath) > 0 {
+			quoted := make([]string, len(op.Body.WrapPath))
+			for i, seg := range op.Body.WrapPath {
+				quoted[i] = strconv.Quote(seg)
+			}
+			fmt.Fprintf(buf, "\t\t\treq.Body = oascmd.NestBody([]string{%s}, body)\n", strings.Join(quoted, ", "))
+		} else {
+			fmt.Fprintf(buf, "\t\t\treq.Body = body\n")
+		}
 		fmt.Fprintf(buf, "\t\t}\n")
 	}
 

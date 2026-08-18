@@ -449,3 +449,109 @@ func TestGenerateFromModelsMatchesGenerate(t *testing.T) {
 		t.Error("GenerateFromModels output differs from Generate")
 	}
 }
+
+// TestGeneratedBodyUnwrap covers Q2 in buildtime mode: the generated
+// constructor exposes the inner flags and re-wraps on submit, matching
+// runtime mode.
+func TestGeneratedBodyUnwrap(t *testing.T) {
+	tests := []struct {
+		name     string
+		newCmd   func(oascmd.ExecOptions) *cobra.Command
+		args     []string
+		wantFlag string
+		wantBody string
+	}{
+		{
+			name:     "auto-detected envelope",
+			newCmd:   goldenpkg.NewOrdersCreateCommand,
+			args:     []string{"--pet-id", "p1", "--quantity", "2"},
+			wantFlag: "pet-id",
+			wantBody: `{"json":{"petId":"p1","quantity":2}}`,
+		},
+		{
+			name:     "declared multi-level envelope",
+			newCmd:   goldenpkg.NewShipmentsCreateCommand,
+			args:     []string{"--address", "1 Main St", "--carrier", "ups"},
+			wantFlag: "address",
+			wantBody: `{"data":{"attributes":{"address":"1 Main St","carrier":"ups"}}}`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var body []byte
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ = io.ReadAll(r.Body)
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+
+			cmd := tc.newCmd(oascmd.ExecOptions{BaseURL: srv.URL, Out: io.Discard})
+			if cmd.Flags().Lookup(tc.wantFlag) == nil {
+				t.Fatalf("--%s not registered on the generated command", tc.wantFlag)
+			}
+			cmd.SetArgs(tc.args)
+			cmd.SetOut(io.Discard)
+			if err := cmd.ExecuteContext(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			var v any
+			if err := json.Unmarshal(body, &v); err != nil {
+				t.Fatalf("body %q is not JSON: %v", body, err)
+			}
+			out, _ := json.Marshal(v)
+			if string(out) != tc.wantBody {
+				t.Errorf("body = %s, want %s", out, tc.wantBody)
+			}
+		})
+	}
+}
+
+// TestGeneratedUnwrapMatchesRuntime pins that both modes derive the same
+// flag surface for an unwrapped body.
+func TestGeneratedUnwrapMatchesRuntime(t *testing.T) {
+	_, models, err := gen.GenerateWithModels(specData(t), gen.Options{PackageName: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, m := range models {
+		if m.Op.ID != "createOrder" {
+			continue
+		}
+		found = true
+		if got := strings.Join(m.Op.Body.WrapPath, "."); got != "json" {
+			t.Errorf("WrapPath = %q, want json", got)
+		}
+		var names []string
+		for _, p := range m.Op.Body.Props {
+			names = append(names, p.Name)
+		}
+		if strings.Join(names, ",") != "petId,quantity,express" {
+			t.Errorf("props = %v", names)
+		}
+	}
+	if !found {
+		t.Fatal("createOrder was not emitted")
+	}
+}
+
+// TestGeneratedLockRecordsUnwrappedSurface: the lock records the effective
+// (post-unwrap) flags plus the envelope path.
+func TestGeneratedLockRecordsUnwrappedSurface(t *testing.T) {
+	_, models, err := gen.GenerateWithModels(specData(t), gen.Options{PackageName: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := lock.Compute(gen.LockModels(models))
+	entry := l.Operations["createShipment"]
+	if entry.Body == nil || entry.Body.Wrap != "data.attributes" {
+		t.Fatalf("body = %+v, want wrap data.attributes", entry.Body)
+	}
+	var names []string
+	for _, f := range entry.Flags {
+		names = append(names, f.Name)
+	}
+	if strings.Join(names, ",") != "address,carrier" {
+		t.Errorf("flags = %v, want the inner properties", names)
+	}
+}

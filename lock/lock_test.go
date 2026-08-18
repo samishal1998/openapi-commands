@@ -371,3 +371,74 @@ func addedOp() lock.Model {
 	m.Path.Name = "create"
 	return m
 }
+
+// TestDiffBodyWrap: changing where the flags land in the JSON body is a
+// breaking change even though the flag names are identical.
+func TestDiffBodyWrap(t *testing.T) {
+	mk := func(wrap string) lock.Lock {
+		op := oascmd.Operation{
+			ID: "createOrder", Method: "POST", Path: "/orders",
+			Body: &oascmd.Body{
+				Flat:     true,
+				WrapPath: oascmd.SplitBodyPath(wrap),
+				Props:    []oascmd.BodyProp{{Name: "petId", Type: oascmd.Type{Kind: oascmd.KindString}}},
+			},
+		}
+		return lock.Compute([]lock.Model{{FuncName: "NewOrdersCreateCommand",
+			Path: oascmd.CommandPath{Groups: []string{"orders"}, Name: "create"}, Op: op}})
+	}
+	tests := []struct {
+		name     string
+		old, new string
+		want     lock.Severity
+		field    string
+	}{
+		{name: "unchanged", old: "json", new: "json", want: lock.SeverityNone},
+		{name: "envelope added", old: "", new: "json", want: lock.SeverityBreaking, field: "body wrap"},
+		{name: "envelope removed", old: "json", new: "", want: lock.SeverityBreaking, field: "body wrap"},
+		{name: "envelope moved", old: "json", new: "data.attributes", want: lock.SeverityBreaking, field: "body wrap"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			report := lock.Diff(mk(tc.old), mk(tc.new))
+			if got := report.Severity(); got != tc.want {
+				t.Fatalf("severity = %s, want %s (%+v)", got, tc.want, report.Operations)
+			}
+			if tc.field == "" {
+				return
+			}
+			found := false
+			for _, op := range report.Operations {
+				for _, c := range op.Changes {
+					if c.Field == tc.field {
+						found = true
+					}
+				}
+			}
+			if !found {
+				t.Errorf("no %q change reported: %+v", tc.field, report.Operations)
+			}
+		})
+	}
+}
+
+// TestToModelRoundTripsWrap: replaying a locked operation keeps its
+// envelope, so additive-only re-emits the same request shape.
+func TestToModelRoundTripsWrap(t *testing.T) {
+	entry := lock.Operation{
+		OperationID: "createOrder", Method: "POST", Path: "/orders", Command: "orders create",
+		Body:  &lock.Body{Flat: true, Required: true, Wrap: "data.attributes"},
+		Flags: []lock.Flag{{Name: "pet-id", APIName: "petId", Source: "body", Type: "string"}},
+	}
+	m, err := lock.ToModel(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(m.Op.Body.WrapPath, "."); got != "data.attributes" {
+		t.Errorf("WrapPath = %q", got)
+	}
+	round := lock.Compute([]lock.Model{m})
+	if got := round.Operations["createOrder"].Body.Wrap; got != "data.attributes" {
+		t.Errorf("wrap after round trip = %q", got)
+	}
+}

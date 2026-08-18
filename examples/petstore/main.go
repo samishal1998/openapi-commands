@@ -6,6 +6,13 @@
 //	go run ./examples/petstore --help
 //	go run ./examples/petstore pets list --limit 5
 //
+// The "orders create" and "shipments create" commands demonstrate body
+// envelope unwrapping: the spec wraps their bodies in {"json": …} and
+// {"data": {"attributes": …}}, but the flags are the inner properties
+// (--pet-id, --address) and the CLI re-wraps them on submit.
+//
+//	go run ./examples/petstore orders create --help
+//
 // Buildtime mode: the go:generate line below emits typed constructors into
 // the petstoregen package, which the "typed" subtree uses.
 //

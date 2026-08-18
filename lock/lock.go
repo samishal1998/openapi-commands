@@ -123,6 +123,11 @@ type Body struct {
 	// (in addition to --data); false means --data only.
 	Flat     bool `json:"flat"`
 	Required bool `json:"required,omitempty"`
+	// Wrap is the dotted envelope path the flags are nested under before
+	// the request is sent ("json", "data.attributes"). Empty means the
+	// body root. It is recorded because it changes what is sent while the
+	// flag names stay the same.
+	Wrap string `json:"wrap,omitempty"`
 }
 
 // Ext records the operation-level x-cli-* values that survived the hooks.
@@ -200,7 +205,11 @@ func computeOperation(m Model) Operation {
 		})
 	}
 	if m.Op.Body != nil {
-		entry.Body = &Body{Flat: m.Op.Body.Flat, Required: m.Op.Body.Required}
+		entry.Body = &Body{
+			Flat:     m.Op.Body.Flat,
+			Required: m.Op.Body.Required,
+			Wrap:     strings.Join(m.Op.Body.WrapPath, "."),
+		}
 		if m.Op.Body.Flat {
 			for _, prop := range m.Op.Body.Props {
 				entry.Flags = append(entry.Flags, Flag{

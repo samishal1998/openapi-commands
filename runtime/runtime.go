@@ -86,6 +86,9 @@ func BuildFromOperations(ops []oascmd.Operation, opts Options) ([]*cobra.Command
 		if !keep {
 			continue
 		}
+		if err := opts.Hooks.ApplyBody(&op); err != nil {
+			return nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
+		}
 		cmd, err := buildCommand(op, nameFunc(op), opts)
 		if err != nil {
 			return nil, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
@@ -198,7 +201,7 @@ func buildCommand(op oascmd.Operation, path oascmd.CommandPath, opts Options) (*
 			if rawData != nil && *rawData != "" {
 				req.RawBody = []byte(*rawData)
 			} else if len(body) > 0 {
-				req.Body = body
+				req.Body = oascmd.NestBody(op.Body.WrapPath, body)
 			} else if op.Body.Required {
 				return fmt.Errorf("a request body is required: pass --data or the body flags")
 			}

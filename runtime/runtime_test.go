@@ -572,3 +572,178 @@ func TestCustomNameFunc(t *testing.T) {
 	}
 	find(t, cmds, "api", "get-listPets")
 }
+
+// TestRuntimeBodyUnwrap covers Q2 in runtime mode end to end: the flags come
+// from the inner object and the request re-wraps them on submit.
+func TestRuntimeBodyUnwrap(t *testing.T) {
+	tests := []struct {
+		name     string
+		command  []string
+		args     []string
+		wantFlag string
+		wantBody string
+	}{
+		{
+			name:     "auto-detected single-property envelope",
+			command:  []string{"orders", "create"},
+			args:     []string{"--pet-id", "p1", "--quantity", "2"},
+			wantFlag: "pet-id",
+			wantBody: `{"json":{"petId":"p1","quantity":2}}`,
+		},
+		{
+			name:     "declared multi-level envelope",
+			command:  []string{"shipments", "create"},
+			args:     []string{"--address", "1 Main St", "--carrier", "ups"},
+			wantFlag: "address",
+			wantBody: `{"data":{"attributes":{"address":"1 Main St","carrier":"ups"}}}`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var body []byte
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ = io.ReadAll(r.Body)
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+
+			cmds, err := Build(fixture(t), Options{Exec: oascmd.ExecOptions{BaseURL: srv.URL, Out: io.Discard}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			cmd := find(t, cmds, tc.command...)
+			if cmd.Flags().Lookup(tc.wantFlag) == nil {
+				t.Fatalf("--%s not registered; flags are still wrapped", tc.wantFlag)
+			}
+			// The envelope itself never becomes a flag. ("--data" and
+			// "--json" are the built-ins, so the check is that the
+			// envelope property did not add typed flags of its own:
+			// --data stays a string and --json stays a bool.)
+			if f := cmd.Flags().Lookup("data"); f == nil || f.Value.Type() != "string" {
+				t.Error("--data must stay the raw-JSON escape hatch")
+			}
+			if f := cmd.Flags().Lookup("json"); f == nil || f.Value.Type() != "bool" {
+				t.Error("--json must stay the output flag, not an envelope flag")
+			}
+			runSubcommand(t, cmds, tc.command, tc.args)
+			if got := normalizeJSON(t, body); got != tc.wantBody {
+				t.Errorf("body = %s, want %s", got, tc.wantBody)
+			}
+		})
+	}
+}
+
+// runSubcommand executes one command of a built tree, under a fresh root so
+// cobra dispatches to it rather than to the group.
+func runSubcommand(t *testing.T, cmds []*cobra.Command, words, args []string) {
+	t.Helper()
+	root := &cobra.Command{Use: "test", SilenceUsage: true, SilenceErrors: true}
+	for _, c := range cmds {
+		root.AddCommand(c)
+	}
+	root.SetArgs(append(append([]string{}, words...), args...))
+	root.SetOut(io.Discard)
+	root.SetErr(io.Discard)
+	if err := root.ExecuteContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// normalizeJSON re-marshals so key order is deterministic.
+func normalizeJSON(t *testing.T, data []byte) string {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		t.Fatalf("body %q is not JSON: %v", data, err)
+	}
+	out, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}
+
+// TestRuntimeBodyUnwrapHook is the programmatic route: the spec declares no
+// envelope, the consumer declares it with OnResolveBody.
+func TestRuntimeBodyUnwrapHook(t *testing.T) {
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	cmds, err := Build(fixture(t), Options{
+		Exec: oascmd.ExecOptions{BaseURL: srv.URL, Out: io.Discard},
+		Hooks: oascmd.Hooks{OnResolveBody: func(op *oascmd.Operation) error {
+			if op.ID == "createPet" {
+				op.Body.Ext.Wrap = "payload"
+			}
+			return nil
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSubcommand(t, cmds, []string{"pets", "create"}, []string{"--name", "Rex"})
+	if got := normalizeJSON(t, body); got != `{"payload":{"name":"Rex"}}` {
+		t.Errorf("body = %s, want the hook-declared envelope", got)
+	}
+}
+
+// TestRuntimeBodyUnwrapCollision asserts the collision rule is an error with
+// a clear message rather than a silently dropped flag.
+func TestRuntimeBodyUnwrapCollision(t *testing.T) {
+	spec := []byte(`
+openapi: 3.1.0
+info: { title: t, version: "1" }
+paths:
+  /x:
+    post:
+      operationId: createX
+      tags: [x]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                json:
+                  type: object
+                  properties:
+                    petId: { type: string }
+                    pet_id: { type: string }
+      responses: { "200": { description: OK } }
+`)
+	_, err := Build(spec, Options{Exec: oascmd.ExecOptions{BaseURL: "http://x"}})
+	if err == nil || !strings.Contains(err.Error(), "both map to --pet-id") {
+		t.Fatalf("err = %v, want a collision error", err)
+	}
+}
+
+// TestRuntimeLockRecordsUnwrappedSurface pins that the lock reflects the
+// post-unwrap flags and the envelope path, so drift stays truthful.
+func TestRuntimeLockRecordsUnwrappedSurface(t *testing.T) {
+	l, err := ComputeLock(fixture(t), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, ok := l.Operations["createOrder"]
+	if !ok {
+		t.Fatal("createOrder missing from the lock")
+	}
+	if entry.Body == nil || entry.Body.Wrap != "json" || !entry.Body.Flat {
+		t.Errorf("body = %+v, want flat with wrap json", entry.Body)
+	}
+	var names []string
+	for _, f := range entry.Flags {
+		names = append(names, f.Name)
+		if f.Source != "body" && f.Source != "path" && f.Source != "query" {
+			t.Errorf("unexpected source %q", f.Source)
+		}
+	}
+	want := "express,pet-id,quantity"
+	if strings.Join(names, ",") != want {
+		t.Errorf("flags = %v, want %s", names, want)
+	}
+}

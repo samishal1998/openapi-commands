@@ -32,6 +32,9 @@ func ComputeLock(data []byte, opts Options) (lock.Lock, error) {
 		if !keep {
 			continue
 		}
+		if err := opts.Hooks.ApplyBody(&op); err != nil {
+			return lock.Lock{}, fmt.Errorf("%s %s: %w", op.Method, op.Path, err)
+		}
 		models = append(models, lock.Model{Path: nameFunc(op), Op: op})
 	}
 	return lock.Compute(models), nil

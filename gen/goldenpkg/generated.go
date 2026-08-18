@@ -56,11 +56,13 @@ func NewCommandTree(exec oascmd.ExecOptions) []*cobra.Command {
 	group("dns", "records").AddCommand(NewDNSRecordsGetCommand(exec))
 	group("internal", "dump").AddCommand(NewInternalDumpDebugCommand(exec))
 	group("legacy").AddCommand(NewLegacyPingCommand(exec))
+	group("orders").AddCommand(NewOrdersCreateCommand(exec))
 	group("pets").AddCommand(NewPetsListCommand(exec))
 	group("pets").AddCommand(NewPetsCreateCommand(exec))
 	group("pets").AddCommand(NewPetsDeleteCommand(exec))
 	group("pets").AddCommand(NewPetsGetCommand(exec))
 	group("tools", "renamed").AddCommand(NewToolsRenamedThingCommand(exec))
+	group("shipments").AddCommand(NewShipmentsCreateCommand(exec))
 	group("untagged", "anon").AddCommand(NewUntaggedAnonPutCommand(exec))
 	return root.Commands()
 }
@@ -134,6 +136,56 @@ func NewLegacyPingCommand(exec oascmd.ExecOptions) *cobra.Command {
 		req := oascmd.Request{
 			Method: "GET",
 			Path:   "/legacy/ping",
+		}
+		e := exec
+		raw, _ := cmd.Flags().GetBool("json")
+		e.Raw = e.Raw || raw
+		if e.Out == nil {
+			e.Out = os.Stdout
+		}
+		return oascmd.Execute(cmd.Context(), e, req)
+	}
+	return cmd
+}
+
+// NewOrdersCreateCommand returns the "orders create" command (POST
+// /orders).
+func NewOrdersCreateCommand(exec oascmd.ExecOptions) *cobra.Command {
+	var (
+		bodyPetID    string
+		bodyQuantity int64
+		bodyExpress  bool
+		flagData     string
+	)
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create an order",
+	}
+	cmd.Flags().StringVar(&bodyPetID, "pet-id", "", "The pet being ordered")
+	cmd.Flags().Int64Var(&bodyQuantity, "quantity", 0, "")
+	cmd.Flags().BoolVar(&bodyExpress, "express", false, "")
+	cmd.Flags().StringVar(&flagData, "data", "", "request body as raw JSON (wins over per-property flags)")
+	cmd.Flags().Bool("json", false, "print the raw JSON response")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		req := oascmd.Request{
+			Method: "POST",
+			Path:   "/orders",
+		}
+		body := map[string]any{}
+		if cmd.Flags().Changed("pet-id") {
+			body["petId"] = bodyPetID
+		}
+		if cmd.Flags().Changed("quantity") {
+			body["quantity"] = bodyQuantity
+		}
+		if cmd.Flags().Changed("express") {
+			body["express"] = bodyExpress
+		}
+		switch {
+		case flagData != "":
+			req.RawBody = []byte(flagData)
+		case len(body) > 0:
+			req.Body = oascmd.NestBody([]string{"json"}, body)
 		}
 		e := exec
 		raw, _ := cmd.Flags().GetBool("json")
@@ -349,6 +401,56 @@ func NewToolsRenamedThingCommand(exec oascmd.ExecOptions) *cobra.Command {
 		req := oascmd.Request{
 			Method: "GET",
 			Path:   "/renamed",
+		}
+		e := exec
+		raw, _ := cmd.Flags().GetBool("json")
+		e.Raw = e.Raw || raw
+		if e.Out == nil {
+			e.Out = os.Stdout
+		}
+		return oascmd.Execute(cmd.Context(), e, req)
+	}
+	return cmd
+}
+
+// NewShipmentsCreateCommand returns the "shipments create" command (POST
+// /shipments).
+func NewShipmentsCreateCommand(exec oascmd.ExecOptions) *cobra.Command {
+	var (
+		bodyAddress string
+		bodyCarrier string
+		flagData    string
+	)
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a shipment",
+	}
+	cmd.Flags().StringVar(&bodyAddress, "address", "", "")
+	cmd.Flags().StringVar(&bodyCarrier, "carrier", "", "(one of: ups, dhl)")
+	cmd.Flags().StringVar(&flagData, "data", "", "request body as raw JSON (wins over per-property flags)")
+	cmd.Flags().Bool("json", false, "print the raw JSON response")
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if cmd.Flags().Changed("carrier") {
+			if err := oascmd.ValidateEnum("carrier", []string{"ups", "dhl"}, bodyCarrier); err != nil {
+				return err
+			}
+		}
+		req := oascmd.Request{
+			Method: "POST",
+			Path:   "/shipments",
+		}
+		body := map[string]any{}
+		if cmd.Flags().Changed("address") {
+			body["address"] = bodyAddress
+		}
+		if cmd.Flags().Changed("carrier") {
+			body["carrier"] = bodyCarrier
+		}
+		switch {
+		case flagData != "":
+			req.RawBody = []byte(flagData)
+		case len(body) > 0:
+			req.Body = oascmd.NestBody([]string{"data", "attributes"}, body)
 		}
 		e := exec
 		raw, _ := cmd.Flags().GetBool("json")

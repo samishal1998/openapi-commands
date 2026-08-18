@@ -32,7 +32,11 @@ func ToModel(entry Operation) (Model, error) {
 		},
 	}
 	if entry.Body != nil {
-		op.Body = &oascmd.Body{Flat: entry.Body.Flat, Required: entry.Body.Required}
+		op.Body = &oascmd.Body{
+			Flat:     entry.Body.Flat,
+			Required: entry.Body.Required,
+			WrapPath: oascmd.SplitBodyPath(entry.Body.Wrap),
+		}
 	}
 	for _, f := range entry.Flags {
 		typ, err := parseType(f.Type)

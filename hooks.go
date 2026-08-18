@@ -24,8 +24,10 @@ var SkipOperation = errors.New("oascmd: skip operation")
 //	OnAfterCreateCommand  runtime only (commands only exist at runtime;
 //	                      generated constructors accept per-command tweaks
 //	                      at their call site instead)
+//	OnResolveBody         runtime + buildtime (declares body wrap/unwrap)
 //	OnBeforeExecute       runtime + generated commands (via ExecOptions)
 //	OnAfterExecute        runtime + generated commands (via ExecOptions)
+//	OnRequestError        runtime + generated commands (via ExecOptions)
 type Hooks struct {
 	// OnReadOperation runs for each operation as it is read from the
 	// spec. It may mutate op. Returning SkipOperation drops the
@@ -38,6 +40,27 @@ type Hooks struct {
 	// OnAfterCreateCommand runs after the command is fully built (flags
 	// registered, RunE set).
 	OnAfterCreateCommand func(op Operation, cmd *cobra.Command) error
+	// OnResolveBody runs for each operation with a request body, after
+	// OnReadOperation and before the envelope rules are applied. It is
+	// how a consumer who cannot edit the spec declares wrapping: set
+	// op.Body.Ext.Unwrap / op.Body.Ext.Wrap (see BodyExtensions).
+	// Returning an error aborts the build.
+	OnResolveBody func(op *Operation) error
+}
+
+// ApplyBody runs the OnResolveBody hook and then ResolveBody, producing the
+// effective flag surface of the operation's request body. Both modes call
+// it right after ApplyRead.
+func (h Hooks) ApplyBody(op *Operation) error {
+	if op.Body == nil {
+		return nil
+	}
+	if h.OnResolveBody != nil {
+		if err := h.OnResolveBody(op); err != nil {
+			return err
+		}
+	}
+	return ResolveBody(op)
 }
 
 // ApplyRead runs the OnReadOperation hook. The bool reports whether the

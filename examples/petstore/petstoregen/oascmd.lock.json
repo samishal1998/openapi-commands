@@ -1,7 +1,7 @@
 {
   "lockVersion": 1,
   "generatorVersion": "oascmd-gen/1",
-  "specDigest": "43d83521ea2fba0e330aca8bc377c5e68067d45d9727fa44fefa9df9d2ed06a4",
+  "specDigest": "2e1974ceee131db3858d53103aa431ad2182127248550e87e14fd427230c7ead",
   "operations": {
     "PUT /untagged/anon": {
       "method": "PUT",
@@ -11,6 +11,41 @@
       "summary": "No operationId, no tags",
       "ext": {},
       "digest": "8f700258c62acef4"
+    },
+    "createOrder": {
+      "operationId": "createOrder",
+      "method": "POST",
+      "path": "/orders",
+      "command": "orders create",
+      "funcName": "NewOrdersCreateCommand",
+      "summary": "Create an order",
+      "flags": [
+        {
+          "name": "express",
+          "source": "body",
+          "type": "bool"
+        },
+        {
+          "name": "pet-id",
+          "apiName": "petId",
+          "source": "body",
+          "type": "string",
+          "required": true,
+          "description": "The pet being ordered"
+        },
+        {
+          "name": "quantity",
+          "source": "body",
+          "type": "int"
+        }
+      ],
+      "body": {
+        "flat": true,
+        "required": true,
+        "wrap": "json"
+      },
+      "ext": {},
+      "digest": "0a35e8eec95a70fe"
     },
     "createPet": {
       "operationId": "createPet",
@@ -29,11 +64,7 @@
           "name": "kind",
           "source": "body",
           "type": "string",
-          "enum": [
-            "dog",
-            "cat",
-            "bird"
-          ]
+          "enum": ["dog", "cat", "bird"]
         },
         {
           "name": "name",
@@ -64,6 +95,35 @@
       },
       "ext": {},
       "digest": "22e7a517ae2fec1f"
+    },
+    "createShipment": {
+      "operationId": "createShipment",
+      "method": "POST",
+      "path": "/shipments",
+      "command": "shipments create",
+      "funcName": "NewShipmentsCreateCommand",
+      "summary": "Create a shipment",
+      "flags": [
+        {
+          "name": "address",
+          "source": "body",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "carrier",
+          "source": "body",
+          "type": "string",
+          "enum": ["ups", "dhl"]
+        }
+      ],
+      "body": {
+        "flat": true,
+        "required": true,
+        "wrap": "data.attributes"
+      },
+      "ext": {},
+      "digest": "9a4bc78b54b659a0"
     },
     "debugDump": {
       "operationId": "debugDump",
@@ -172,11 +232,7 @@
           "name": "status",
           "source": "query",
           "type": "string",
-          "enum": [
-            "available",
-            "pending",
-            "sold"
-          ]
+          "enum": ["available", "pending", "sold"]
         },
         {
           "name": "tags",

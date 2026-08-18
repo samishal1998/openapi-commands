@@ -89,6 +89,66 @@ paths:
       responses:
         "204":
           description: Deleted
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [json]
+              properties:
+                json:
+                  type: object
+                  required: [petId]
+                  properties:
+                    petId:
+                      type: string
+                      description: The pet being ordered
+                    quantity:
+                      type: integer
+                    express:
+                      type: boolean
+      responses:
+        "201":
+          description: Created
+  /shipments:
+    post:
+      operationId: createShipment
+      tags: [shipments]
+      summary: Create a shipment
+      requestBody:
+        required: true
+        x-cli-body-unwrap: data.attributes
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                meta:
+                  type: object
+                  properties:
+                    traceId:
+                      type: string
+                data:
+                  type: object
+                  properties:
+                    attributes:
+                      type: object
+                      required: [address]
+                      properties:
+                        address:
+                          type: string
+                        carrier:
+                          type: string
+                          enum: [ups, dhl]
+      responses:
+        "201":
+          description: Created
   /dns/records:
     get:
       operationId: getDnsRecords

@@ -25,6 +25,7 @@ generic and knows nothing about Namefi.
 
 ```
 oascmd.go        the normalized Operation model (shared by both modes)
+body.go          request-body envelope resolution (wrap / unwrap)
 naming.go        command-path derivation + flag-name rules
 exec.go          request building, auth hook, execution, output printing
 hooks.go         the Hooks surface, SkipOperation, confirmation prompt
@@ -116,6 +117,52 @@ Both modes share the same model, naming rules, extension handling, and
 executor, so a command behaves identically either way (the example CLI shows
 the same operations under both).
 
+## What you can configure
+
+Three questions this library gets asked, and where each answer lives.
+
+**1. The HTTP client — auth, headers, cookies.** All on `oascmd.ExecOptions`,
+which both modes accept (`runtime.Options.Exec`, and the argument to every
+generated constructor).
+
+| Field | What it does |
+|---|---|
+| `Client *http.Client` | Your client, so you control timeouts, proxies, TLS and transport. `http.DefaultClient` when nil. |
+| `CookieJar http.CookieJar` | Installed on a **copy** of `Client` (your client is never mutated) when it has no jar of its own. |
+| `Headers http.Header` | Static default headers on every request. They win over the executor's own `Accept`/`Content-Type`. |
+| `Cookies []*http.Cookie` | Explicit cookies attached to every request, in addition to the jar. |
+| `Auth AuthFunc` | Called on every request after headers and cookies. |
+| `OnBeforeExecute` | Per-request mutation: headers, URL, body (see the hooks matrix). |
+
+Auth helpers cover the common shapes; `AuthFunc` is just
+`func(*http.Request) error`, so anything else is a closure:
+
+```go
+oascmd.ExecOptions{
+    BaseURL:   "https://api.example.com",
+    Client:    &http.Client{Timeout: 10 * time.Second},
+    CookieJar: jar,
+    Headers:   http.Header{"X-Client": {"mycli/1.2"}},
+    Cookies:   []*http.Cookie{{Name: "tenant", Value: "acme"}},
+    Auth: oascmd.ChainAuth(
+        oascmd.BearerAuth(token),              // Authorization: Bearer …
+        oascmd.APIKeyAuth("X-API-Key", key),   // any named header
+        // oascmd.BasicAuth(user, pass)        // Authorization: Basic …
+        func(req *http.Request) error {        // anything else
+            req.Header.Set("X-Signature", sign(req))
+            return nil
+        },
+    ),
+}
+```
+
+**2. Body envelopes.** Wrapped bodies are unwrapped so the flags are the
+inner ones. See [Body envelopes](#body-envelopes-wrapping-and-unwrapping).
+
+**3. Request/response lifecycle.** `OnBeforeExecute`, `OnAfterExecute` and
+`OnRequestError` on `ExecOptions`, all firing in both modes. See the
+[hooks matrix](#hooks).
+
 ## Derivation rules
 
 ### Command path
@@ -174,6 +221,86 @@ Override the whole rule with `Options.NameFunc` (both modes), which takes an
 - Every command gets `--json` (print the response body raw instead of
   pretty-printed). Operations marked `x-cli-confirm` also get `--yes`.
 
+### Body envelopes (wrapping and unwrapping)
+
+Some APIs wrap the request body in an envelope: `{"json": {…}}`,
+`{"payload": {…}}`, `{"data": {"attributes": {…}}}`. Flags named
+`--payload.arg1` would be miserable to type, so `oascmd` **unwraps** the
+envelope: the flags are the inner properties (`--arg1 --arg2`) and the CLI
+re-wraps them when it builds the request. `--data` still takes the whole raw
+body, envelope included.
+
+Three ways to declare it, checked in this order:
+
+1. **Automatic.** While the body has *exactly one* property and that
+   property is an object, it is treated as an envelope and descended into.
+   `{"json": {"petId": …}}` gives `--pet-id`; `{"json": {…}, "meta": …}` is
+   ambiguous, so nothing is unwrapped.
+2. **Declared in the spec**, on the request body (or its schema):
+   `x-cli-body-unwrap: payload`, dotted for several levels
+   (`data.attributes`). `x-cli-body-unwrap: none` (or `false`) turns
+   automatic detection off; `auto` (or `true`) is the default.
+   `x-cli-body-wrap: envelope` is the inverse — it nests the assembled body
+   under a wrapper the spec does **not** describe.
+3. **Programmatically**, for specs you cannot edit: the `OnResolveBody` hook
+   runs just before resolution and sets the same two fields.
+
+```go
+Hooks: oascmd.Hooks{
+    OnResolveBody: func(op *oascmd.Operation) error {
+        if op.ID == "createPet" {
+            op.Body.Ext.Wrap = "payload"      // send {"payload": {…}}
+            // op.Body.Ext.Unwrap = "payload" // or flatten an existing one
+        }
+        return nil
+    },
+},
+```
+
+The precise rules:
+
+- **Order.** `x-cli-body-wrap` supplies the outermost segments; the unwrapped
+  envelope path is appended inside it. Both together give
+  `{"envelope": {"json": {…flags…}}}`.
+- **Depth.** Automatic detection descends as far as the single-object-property
+  chain goes; an explicit path may name any depth.
+- **Errors, not surprises.** An explicit path naming a property that does not
+  exist, or that is not an object, is a build error.
+- **Collisions.** If two properties end up deriving the same flag name after
+  unwrapping (`petId` and `pet_id` both give `--pet-id`), the build fails
+  with a message naming both. Fix it with `x-cli-flag-name` on one of them,
+  or turn unwrapping off with `x-cli-body-unwrap: none`.
+- **Leftovers.** If a resolved property is still a nested object, the body is
+  not flat: the command gets `--data` only, as before.
+- **Both modes, one rule.** Runtime and buildtime resolve bodies with the same
+  `oascmd.ResolveBody`, so the flags and the submitted JSON are identical.
+- **The lock records the effective surface.** `body.wrap` holds the envelope
+  path and the flags are the post-unwrap ones, so drift detection describes
+  what a user actually types. Changing the envelope is **breaking**: the same
+  flags now land somewhere else in the payload.
+
+```yaml
+/orders:
+  post:
+    operationId: createOrder
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              json:                        # auto-detected envelope
+                type: object
+                properties:
+                  petId: { type: string }
+                  quantity: { type: integer }
+```
+
+```sh
+myapi orders create --pet-id p1 --quantity 2
+# POST /orders  {"json":{"petId":"p1","quantity":2}}
+```
+
 ### Execution and output
 
 The request is built against `ExecOptions.BaseURL`, path parameters are
@@ -193,6 +320,8 @@ snippet capped at 512 bytes.
 | `x-cli-hidden` | operation | Sets `cmd.Hidden`: the command works but is omitted from help. |
 | `x-cli-skip` | operation | Drops the operation entirely, in both modes. |
 | `x-cli-confirm` | operation | Prompts `[y/N]` before executing; `--yes` skips the prompt. For destructive operations. |
+| `x-cli-body-unwrap` | request body | Names the envelope property whose inner properties become the flags (`payload`, `data.attributes`). `none`/`false` disables automatic detection; `auto`/`true` is the default. |
+| `x-cli-body-wrap` | request body | Nests the assembled body under an envelope the spec does not describe (dotted for several levels). |
 | `x-cli-flag-name` | parameter / body property | Overrides the derived flag name. |
 | `x-cli-shorthand` | parameter / body property | Adds a one-letter shorthand (`-l`). |
 
@@ -244,8 +373,30 @@ things the spec cannot express.
 | `OnBeforeCreateCommand` | `func(op Operation, cmd *cobra.Command) error` | ✅ | ➖ | Runs after the command is constructed, before flags are registered. Mutate `cmd`, or return `SkipOperation` to veto it. |
 | `OnAfterCreateCommand` | `func(op Operation, cmd *cobra.Command) error` | ✅ | ➖ | Runs after the command is fully built (flags + `RunE`). |
 | `gen.Options.OnEmitOperation` | `func(cmd *gen.CommandModel) error` | ➖ | ✅ | The buildtime analogue of the create hooks: rename the emitted constructor, relocate the command, or veto with `SkipOperation`. Commands do not exist yet at generation time, so `*cobra.Command` cannot be handed to you. |
-| `ExecOptions.OnBeforeExecute` | `[]func(ctx, *http.Request) error` | ✅ | ✅ | Runs after auth, before the request is sent. Add tracing headers, log, or abort. |
-| `ExecOptions.OnAfterExecute` | `[]func(ctx, *http.Response) error` | ✅ | ✅ | Runs when the response arrives, before the body is read and printed. |
+| `OnResolveBody` | `func(op *Operation) error` | ✅ | ✅ | Runs per operation with a body, after `OnReadOperation` and before envelope resolution. Set `op.Body.Ext.Unwrap` / `.Wrap` for specs you cannot edit. |
+| `ExecOptions.OnBeforeExecute` | `[]func(ctx, *http.Request) error` | ✅ | ✅ | Runs after headers, cookies and auth, before the request is sent. **May mutate** the request (headers, URL, and the body via `oascmd.SetRequestBody`) or abort by returning an error. |
+| `ExecOptions.OnAfterExecute` | `[]func(ctx, *http.Response) error` | ✅ | ✅ | Runs when the response arrives, before the body is read, the status is checked, and anything is printed. **May inspect and transform** the response (including replacing `resp.Body`) or abort. Fires for non-2xx responses too. |
+| `ExecOptions.OnRequestError` | `func(ctx, *http.Request, attempt int, err error) (retry bool, err error)` | ✅ | ✅ | Runs when the transport fails (no response: DNS, connection, timeout). Return `retry=true` to re-send (the body is replayed), an error to abort with it, or `(false, nil)` to surface the transport error. Capped at 100 attempts. |
+
+**Execution order**, precisely:
+
+```
+build request
+  -> ExecOptions.Headers        (overwrite, so they win over Accept/Content-Type)
+  -> ExecOptions.Cookies
+  -> Auth
+  -> OnBeforeExecute[0..n]      in declaration order; any error aborts
+  -> send  --- transport error --> OnRequestError -> (retry: back to send)
+       |
+       response
+  -> OnAfterExecute[0..n]       in declaration order; any error aborts
+  -> status check (non-2xx -> *StatusError)
+  -> print
+```
+
+Every hook that returns an error aborts the run with it, so any of them can
+veto. Mutating a request body from a hook must go through
+`oascmd.SetRequestBody`, which keeps the request replayable for retries.
 
 The execute hooks live on `ExecOptions`, which generated constructors accept,
 so they apply to generated commands too. Per-command customization in
@@ -488,8 +639,9 @@ moves past 1.25.
 
 - Only `application/json` request bodies are mapped. Other media types (form
   data, multipart uploads) are ignored.
-- Header and cookie parameters are not exposed as flags; supply them from the
-  `Auth` hook or `OnBeforeExecute`.
+- Header and cookie parameters declared in the spec are not exposed as flags;
+  supply them from `ExecOptions.Headers`, `ExecOptions.Cookies`, the `Auth`
+  hook, or `OnBeforeExecute`.
 - Responses are printed, not decoded. Buildtime mode emits response-shaped
   structs you can unmarshal into yourself, but commands do not do it for you.
 - Runtime validation is best effort: required-ness, scalar types, and enums

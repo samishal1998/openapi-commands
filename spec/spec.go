@@ -147,42 +147,61 @@ func convertBody(rb *v3.RequestBody) (*oascmd.Body, error) {
 	if rb.Required != nil {
 		body.Required = *rb.Required
 	}
+	body.Ext = bodyExtensions(rb.Extensions)
 	schema := media.Schema.Schema()
-	if schema == nil || !hasType(schema, "object") || schema.Properties == nil {
+	if schema == nil {
 		return body, nil
 	}
+	if body.Ext.Unwrap == "" && body.Ext.Wrap == "" {
+		// The extensions may also sit on the schema itself, which is
+		// where a $ref'd envelope can declare them.
+		body.Ext = bodyExtensions(schema.Extensions)
+	}
+	if !hasType(schema, "object") || schema.Properties == nil {
+		return body, nil
+	}
+	body.Props = convertBodyProps(schema)
+	body.Flat = len(body.Props) > 0
+	return body, nil
+}
 
+// convertBodyProps converts the properties of an object schema. A property
+// that is itself an object keeps its children in BodyProp.Object so
+// oascmd.ResolveBody can unwrap an envelope; a property representable as
+// neither scalar nor object is dropped, which leaves the body non-flat.
+func convertBodyProps(schema *base.Schema) []oascmd.BodyProp {
 	required := map[string]bool{}
 	for _, name := range schema.Required {
 		required[name] = true
 	}
-	flat := true
 	var props []oascmd.BodyProp
 	for pair := schema.Properties.First(); pair != nil; pair = pair.Next() {
 		propSchema := pair.Value().Schema()
-		typ, enum, def, err := convertSchema(propSchema)
-		if err != nil {
-			flat = false
-			break
-		}
-		prop := oascmd.BodyProp{
-			Name:     pair.Key(),
-			Type:     typ,
-			Required: required[pair.Key()],
-			Enum:     enum,
-			Default:  def,
-		}
+		prop := oascmd.BodyProp{Name: pair.Key(), Required: required[pair.Key()]}
 		if propSchema != nil {
 			prop.Description = propSchema.Description
 			prop.Ext = paramExtensions(propSchema.Extensions)
 		}
+		if propSchema != nil && hasType(propSchema, "object") && propSchema.Properties != nil {
+			prop.Object = convertBodyProps(propSchema)
+			if prop.Object == nil {
+				// An object with no representable children
+				// cannot back flags at all.
+				return nil
+			}
+			props = append(props, prop)
+			continue
+		}
+		typ, enum, def, err := convertSchema(propSchema)
+		if err != nil {
+			return nil
+		}
+		prop.Type = typ
+		prop.Enum = enum
+		prop.Default = def
 		props = append(props, prop)
 	}
-	if flat {
-		body.Flat = true
-		body.Props = props
-	}
-	return body, nil
+	return props
 }
 
 // convertSchema maps a scalar or array-of-scalar schema to a CLI type. It
@@ -279,6 +298,26 @@ func operationExtensions(ext extMap) oascmd.Extensions {
 		Skip:    extBool(ext, "x-cli-skip"),
 		Confirm: extBool(ext, "x-cli-confirm"),
 	}
+}
+
+func bodyExtensions(ext extMap) oascmd.BodyExtensions {
+	return oascmd.BodyExtensions{
+		Unwrap: extScalar(ext, "x-cli-body-unwrap"),
+		Wrap:   extString(ext, "x-cli-body-wrap"),
+	}
+}
+
+// extScalar reads an extension whose value may be a string or a boolean
+// (x-cli-body-unwrap accepts both: "payload", true, false).
+func extScalar(ext extMap, key string) string {
+	if ext == nil {
+		return ""
+	}
+	node, ok := ext.Get(key)
+	if !ok || node == nil {
+		return ""
+	}
+	return node.Value
 }
 
 func paramExtensions(ext extMap) oascmd.ParamExtensions {

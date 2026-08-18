@@ -266,6 +266,10 @@ func diffBody(o, n *Body) []FieldChange {
 		out = append(out, FieldChange{Field: "body shape", Old: bodyStr(o), New: bodyStr(n), Severity: SeverityBreaking,
 			Detail: "the body is passed differently now; per-property flags appear or disappear"})
 	}
+	if o.Wrap != n.Wrap {
+		out = append(out, FieldChange{Field: "body wrap", Old: wrapStr(o.Wrap), New: wrapStr(n.Wrap), Severity: SeverityBreaking,
+			Detail: "the same flags are now sent at a different place in the JSON body; the API sees a different payload"})
+	}
 	if o.Required != n.Required && n.Required {
 		out = append(out, FieldChange{Field: "body required", Old: "false", New: "true", Severity: SeverityBreaking,
 			Detail: "the body is now mandatory; calls that omitted it fail"})
@@ -274,6 +278,13 @@ func diffBody(o, n *Body) []FieldChange {
 			Detail: "the body is now optional"})
 	}
 	return out
+}
+
+func wrapStr(wrap string) string {
+	if wrap == "" {
+		return "(body root)"
+	}
+	return wrap
 }
 
 func bodyStr(b *Body) string {

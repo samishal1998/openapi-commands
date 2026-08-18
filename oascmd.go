@@ -70,8 +70,7 @@ type Param struct {
 	Ext     ParamExtensions
 }
 
-// BodyProp is a top-level property of a flat JSON request body, mapped to a
-// flag.
+// BodyProp is a property of a JSON request body, mapped to a flag.
 type BodyProp struct {
 	Name        string
 	Type        Type
@@ -80,17 +79,47 @@ type BodyProp struct {
 	Enum        []string
 	Default     string
 	Ext         ParamExtensions
+	// Object is non-nil when this property is itself an object with
+	// properties. Such a property cannot be a flag on its own; it is the
+	// raw material for envelope unwrapping (see ResolveBody). After
+	// resolution, Body.Props never contains one.
+	Object []BodyProp
+}
+
+// BodyExtensions carries the request-body-level x-cli-* extension values.
+type BodyExtensions struct {
+	// Unwrap (x-cli-body-unwrap) names the envelope property whose inner
+	// properties become the flags: "payload", or a dotted path
+	// "data.attributes" for several levels. The special values "auto"
+	// (or true) force the default automatic detection, and "none" (or
+	// false) disable it.
+	Unwrap string
+	// Wrap (x-cli-body-wrap) names an envelope the spec does not
+	// describe: the assembled body is nested under it before it is sent.
+	// Dotted for several levels.
+	Wrap string
 }
 
 // Body describes the application/json request body of an operation.
 type Body struct {
 	Required bool
-	// Flat is true when the schema is an object whose top-level properties
-	// are all scalars or arrays of scalars. Flat bodies get one flag per
-	// property in addition to --data; non-flat bodies get only --data.
-	Flat        bool
+	// Flat is true when the effective body (after envelope resolution) is
+	// an object whose properties are all scalars or arrays of scalars.
+	// Flat bodies get one flag per property in addition to --data;
+	// non-flat bodies get only --data.
+	Flat bool
+	// Props are the flag-bearing properties of the effective body. Before
+	// ResolveBody runs they are the schema's top-level properties (nested
+	// objects included, carrying Object); after it they are the resolved,
+	// scalar-only set.
 	Props       []BodyProp
 	Description string
+	// WrapPath is where Props are written inside the request body. Empty
+	// means the body root; ["json"] sends {"json": {...}}. It is set by
+	// ResolveBody from unwrapping an envelope, from x-cli-body-wrap, or
+	// from a programmatic BodyResolver.
+	WrapPath []string
+	Ext      BodyExtensions
 }
 
 // Operation is the normalized view of one OpenAPI operation. Both the

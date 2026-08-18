@@ -46,8 +46,8 @@ func findParam(t *testing.T, op oascmd.Operation, name string) oascmd.Param {
 
 func TestLoadYAML(t *testing.T) {
 	ops := loadFixture(t)
-	if len(ops) != 10 {
-		t.Fatalf("got %d operations, want 10", len(ops))
+	if len(ops) != 12 {
+		t.Fatalf("got %d operations, want 12", len(ops))
 	}
 
 	list := findOp(t, ops, "listPets")
@@ -231,5 +231,79 @@ func TestLoadWithSchemas(t *testing.T) {
 	}
 	if f := ownerFields["pets"]; f.Ref != "Pet" || !f.Type.Array {
 		t.Errorf("pets field = %+v, want array ref to Pet", f)
+	}
+}
+
+// TestBodyEnvelopeParsing checks what the parser hands ResolveBody: nested
+// object properties survive as BodyProp.Object, and the body-level
+// extensions are read.
+func TestBodyEnvelopeParsing(t *testing.T) {
+	ops := loadFixture(t)
+
+	order := findOp(t, ops, "createOrder")
+	if order.Body == nil || len(order.Body.Props) != 1 {
+		t.Fatalf("createOrder body = %+v, want the single envelope property", order.Body)
+	}
+	env := order.Body.Props[0]
+	if env.Name != "json" || len(env.Object) != 3 {
+		t.Fatalf("envelope = %+v, want json with 3 inner properties", env)
+	}
+
+	ship := findOp(t, ops, "createShipment")
+	if ship.Body == nil || ship.Body.Ext.Unwrap != "data.attributes" {
+		t.Fatalf("createShipment x-cli-body-unwrap = %q", ship.Body.Ext.Unwrap)
+	}
+
+	// The parser leaves resolution to oascmd.ResolveBody.
+	if err := oascmd.ResolveBody(&order); err != nil {
+		t.Fatal(err)
+	}
+	if len(order.Body.WrapPath) != 1 || order.Body.WrapPath[0] != "json" {
+		t.Errorf("WrapPath = %v", order.Body.WrapPath)
+	}
+}
+
+func TestBodyExtensionsFromSpec(t *testing.T) {
+	tests := []struct {
+		name       string
+		ext        string
+		wantUnwrap string
+		wantWrap   string
+	}{
+		{name: "string unwrap", ext: "x-cli-body-unwrap: payload", wantUnwrap: "payload"},
+		{name: "boolean false unwrap", ext: "x-cli-body-unwrap: false", wantUnwrap: "false"},
+		{name: "wrap", ext: "x-cli-body-wrap: envelope", wantWrap: "envelope"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := `
+openapi: 3.1.0
+info: { title: t, version: "1" }
+paths:
+  /x:
+    post:
+      operationId: createX
+      requestBody:
+        ` + tc.ext + `
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: object
+                  properties:
+                    a: { type: string }
+      responses: { "200": { description: OK } }
+`
+			ops, err := Load([]byte(doc))
+			if err != nil {
+				t.Fatal(err)
+			}
+			body := ops[0].Body
+			if body.Ext.Unwrap != tc.wantUnwrap || body.Ext.Wrap != tc.wantWrap {
+				t.Errorf("ext = %+v, want unwrap %q wrap %q", body.Ext, tc.wantUnwrap, tc.wantWrap)
+			}
+		})
 	}
 }
