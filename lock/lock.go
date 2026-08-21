@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/openapi-commands"
 )
 
 // Version is the lock schema version. It is bumped when the on-disk shape

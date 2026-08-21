@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
+	"github.com/d3servelabs/openapi-commands/lock"
 )
 
 // minimalSpec is a small hand-written spec so drift can be introduced

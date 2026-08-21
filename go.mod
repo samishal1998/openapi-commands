@@ -1,4 +1,4 @@
-module github.com/d3servelabs/namefi-astra/projects/oascmd
+module github.com/d3servelabs/openapi-commands
 
 go 1.23.5
 

@@ -3,9 +3,9 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/spec"
+	"github.com/d3servelabs/openapi-commands"
+	"github.com/d3servelabs/openapi-commands/lock"
+	"github.com/d3servelabs/openapi-commands/spec"
 )
 
 // ComputeLock builds a lock snapshot of the command surface this spec would

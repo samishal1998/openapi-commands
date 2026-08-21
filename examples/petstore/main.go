@@ -24,7 +24,7 @@
 // regenerates only when the change is safe; a breaking change is refused
 // with a report (see the README for the severity ladder and policies).
 //
-//go:generate go run github.com/d3servelabs/namefi-astra/projects/oascmd/cmd/oascmd-gen -spec ../../testdata/petstore.yaml -package petstoregen -out petstoregen/generated.go -on-drift auto
+//go:generate go run github.com/d3servelabs/openapi-commands/cmd/oascmd-gen -spec ../../testdata/petstore.yaml -package petstoregen -out petstoregen/generated.go -on-drift auto
 package main
 
 import (
@@ -35,9 +35,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/examples/petstore/petstoregen"
-	oasruntime "github.com/d3servelabs/namefi-astra/projects/oascmd/runtime"
+	"github.com/d3servelabs/openapi-commands"
+	"github.com/d3servelabs/openapi-commands/examples/petstore/petstoregen"
+	oasruntime "github.com/d3servelabs/openapi-commands/runtime"
 )
 
 //go:embed petstore.yaml

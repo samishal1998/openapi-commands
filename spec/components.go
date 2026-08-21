@@ -7,7 +7,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	"github.com/pb33f/libopenapi/datamodel/high/base"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/openapi-commands"
 )
 
 // ComponentField is one property of a component object schema, in a shape

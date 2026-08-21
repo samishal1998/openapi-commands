@@ -11,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/openapi-commands"
 )
 
 // Owner is the "Owner" component schema.

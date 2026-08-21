@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/openapi-commands"
 )
 
 // ToModel rebuilds the post-hook model of a recorded operation. It is the

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/gen"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
+	"github.com/d3servelabs/openapi-commands/gen"
+	"github.com/d3servelabs/openapi-commands/lock"
 )
 
 const usage = `usage: oascmd-gen -spec <file> -package <name> [-out <file>] [options]

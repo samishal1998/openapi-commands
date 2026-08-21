@@ -13,9 +13,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/spec"
+	"github.com/d3servelabs/openapi-commands"
+	"github.com/d3servelabs/openapi-commands/lock"
+	"github.com/d3servelabs/openapi-commands/spec"
 )
 
 // CommandModel is the emit-time view of one generated command that hooks may
@@ -224,7 +224,7 @@ func collectImports(schemas []spec.ComponentSchema, models []CommandModel) []str
 		lines = append(lines, "")
 	}
 	if needsOascmd {
-		lines = append(lines, strconv.Quote("github.com/d3servelabs/namefi-astra/projects/oascmd"))
+		lines = append(lines, strconv.Quote("github.com/d3servelabs/openapi-commands"))
 	}
 	return lines
 }

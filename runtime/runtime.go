@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/spec"
+	"github.com/d3servelabs/openapi-commands"
+	"github.com/d3servelabs/openapi-commands/spec"
 )
 
 // Options configures the runtime command builder.

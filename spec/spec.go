@@ -16,7 +16,7 @@ import (
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 	"gopkg.in/yaml.v3"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
+	"github.com/d3servelabs/openapi-commands"
 )
 
 // Load parses an OpenAPI 3.0/3.1 document (JSON or YAML) and returns its

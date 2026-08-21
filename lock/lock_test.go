@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d3servelabs/namefi-astra/projects/oascmd"
-	"github.com/d3servelabs/namefi-astra/projects/oascmd/lock"
+	"github.com/d3servelabs/openapi-commands"
+	"github.com/d3servelabs/openapi-commands/lock"
 )
 
 // baseModel is a small, complete operation used as the "before" side of the
