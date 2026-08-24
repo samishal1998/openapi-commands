@@ -307,3 +307,51 @@ paths:
 		})
 	}
 }
+
+// TestParamSkipDropsUnrepresentableParam covers the escape hatch for a
+// parameter that has no flag form.
+//
+// A real case: Namefi's `GET /dns/records` takes an object-typed `payload`
+// query parameter whose one field, `zoneName`, is ALSO exposed as its own
+// scalar parameter. Without an opt-out that single parameter fails the entire
+// generation ("type \"object\" not representable as a flag"), and the only
+// other fix is editing a spec you may not control.
+//
+// The skip has to be honoured BEFORE the schema is converted, or conversion
+// fails first and the opt-out never runs.
+func TestParamSkipDropsUnrepresentableParam(t *testing.T) {
+	doc := []byte(`
+openapi: 3.1.0
+info: {title: t, version: v}
+paths:
+  /records:
+    get:
+      operationId: listRecords
+      parameters:
+        - name: payload
+          in: query
+          schema:
+            type: object
+            properties:
+              zoneName: {type: string}
+          x-cli-skip: true
+        - name: zoneName
+          in: query
+          schema: {type: string}
+      responses:
+        "200": {description: ok}
+`)
+	ops, err := Load(doc)
+	if err != nil {
+		t.Fatalf("x-cli-skip should let an unrepresentable parameter through: %v", err)
+	}
+	op := findOp(t, ops, "listRecords")
+	for _, p := range op.Params {
+		if p.Name == "payload" {
+			t.Error("the skipped parameter should not be mapped to a flag")
+		}
+	}
+	if len(op.Params) != 1 || op.Params[0].Name != "zoneName" {
+		t.Errorf("expected only zoneName to survive, got %+v", op.Params)
+	}
+}

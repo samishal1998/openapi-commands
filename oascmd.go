@@ -50,6 +50,15 @@ type ParamExtensions struct {
 	FlagName string
 	// Shorthand (x-cli-shorthand) is a one-letter flag shorthand.
 	Shorthand string
+	// Skip (x-cli-skip) drops the parameter instead of mapping it to a
+	// flag.
+	//
+	// The escape hatch for a parameter that has no sensible flag form: an
+	// object-typed query parameter, say, whose fields are already exposed
+	// individually. Without it a single such parameter fails the whole
+	// generation, and the only other way out is editing a spec you may not
+	// own.
+	Skip bool
 }
 
 // Param is a path or query parameter mapped to a flag.

@@ -115,6 +115,12 @@ func convertParam(p *v3.Parameter) (oascmd.Param, bool, error) {
 		Description: p.Description,
 		Ext:         paramExtensions(p.Extensions),
 	}
+	// Checked before the schema is converted: the whole point of skipping a
+	// parameter is usually that its schema has no flag form, so converting
+	// it first would fail before the opt-out could take effect.
+	if param.Ext.Skip {
+		return oascmd.Param{}, false, nil
+	}
 	if p.Required != nil {
 		param.Required = *p.Required
 	}
@@ -324,6 +330,7 @@ func paramExtensions(ext extMap) oascmd.ParamExtensions {
 	return oascmd.ParamExtensions{
 		FlagName:  extString(ext, "x-cli-flag-name"),
 		Shorthand: extString(ext, "x-cli-shorthand"),
+		Skip:      extBool(ext, "x-cli-skip"),
 	}
 }
 

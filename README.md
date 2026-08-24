@@ -319,6 +319,7 @@ snippet capped at 512 bytes.
 | `x-cli-group` | operation | Overrides the tag-derived group. Space-separated words nest. |
 | `x-cli-hidden` | operation | Sets `cmd.Hidden`: the command works but is omitted from help. |
 | `x-cli-skip` | operation | Drops the operation entirely, in both modes. |
+| `x-cli-skip` | parameter | Drops the parameter instead of mapping it to a flag. The escape hatch for a parameter with no flag form, such as an object-typed query parameter whose fields are already exposed individually; without it that one parameter fails the whole generation. |
 | `x-cli-confirm` | operation | Prompts `[y/N]` before executing; `--yes` skips the prompt. For destructive operations. |
 | `x-cli-body-unwrap` | request body | Names the envelope property whose inner properties become the flags (`payload`, `data.attributes`). `none`/`false` disables automatic detection; `auto`/`true` is the default. |
 | `x-cli-body-wrap` | request body | Nests the assembled body under an envelope the spec does not describe (dotted for several levels). |
