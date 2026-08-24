@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d3servelabs/openapi-commands"
-	"github.com/d3servelabs/openapi-commands/lock"
-	oasruntime "github.com/d3servelabs/openapi-commands/runtime"
+	"github.com/samishal1998/openapi-commands"
+	"github.com/samishal1998/openapi-commands/lock"
+	oasruntime "github.com/samishal1998/openapi-commands/runtime"
 )
 
 func verifySpec(t *testing.T) []byte {

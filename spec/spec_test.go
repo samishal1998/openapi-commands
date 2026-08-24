@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/d3servelabs/openapi-commands"
+	"github.com/samishal1998/openapi-commands"
 )
 
 func loadFixture(t *testing.T) []oascmd.Operation {

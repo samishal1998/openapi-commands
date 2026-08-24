@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/d3servelabs/openapi-commands/gen"
-	"github.com/d3servelabs/openapi-commands/lock"
+	"github.com/samishal1998/openapi-commands/gen"
+	"github.com/samishal1998/openapi-commands/lock"
 )
 
 const usage = `usage: oascmd-gen -spec <file> -package <name> [-out <file>] [options]

@@ -5,7 +5,7 @@ Turn an OpenAPI 3.0/3.1 document into a Cobra command tree — at **runtime**
 strongly-typed Go source you compile).
 
 ```
-module github.com/d3servelabs/openapi-commands   (Go 1.23.5)
+module github.com/samishal1998/openapi-commands   (Go 1.23.5)
 ```
 
 ## Why
@@ -44,8 +44,8 @@ testdata/        the fixture spec exercising every supported feature
 
 ```go
 import (
-    "github.com/d3servelabs/openapi-commands"
-    oasruntime "github.com/d3servelabs/openapi-commands/runtime"
+    "github.com/samishal1998/openapi-commands"
+    oasruntime "github.com/samishal1998/openapi-commands/runtime"
 )
 
 root := &cobra.Command{Use: "myapi"}
@@ -67,7 +67,7 @@ source the model yourself.
 ## Quickstart: buildtime mode
 
 ```go
-//go:generate go run github.com/d3servelabs/openapi-commands/cmd/oascmd-gen -spec api.yaml -package apicli -out zz_generated.go
+//go:generate go run github.com/samishal1998/openapi-commands/cmd/oascmd-gen -spec api.yaml -package apicli -out zz_generated.go
 ```
 
 The emitted file contains:
@@ -575,7 +575,7 @@ CI to consume; it is golden-tested.
 The CLI is a thin wrapper; the package is the real interface.
 
 ```go
-import "github.com/d3servelabs/openapi-commands/lock"
+import "github.com/samishal1998/openapi-commands/lock"
 
 source, models, err := gen.GenerateWithModels(specData, opts)  // post-hook models
 next := lock.Compute(gen.LockModels(models))

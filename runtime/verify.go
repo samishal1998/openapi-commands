@@ -3,9 +3,9 @@ package runtime
 import (
 	"fmt"
 
-	"github.com/d3servelabs/openapi-commands"
-	"github.com/d3servelabs/openapi-commands/lock"
-	"github.com/d3servelabs/openapi-commands/spec"
+	"github.com/samishal1998/openapi-commands"
+	"github.com/samishal1998/openapi-commands/lock"
+	"github.com/samishal1998/openapi-commands/spec"
 )
 
 // ComputeLock builds a lock snapshot of the command surface this spec would

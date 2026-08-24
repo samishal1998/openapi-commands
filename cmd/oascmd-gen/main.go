@@ -1,7 +1,7 @@
 // Command oascmd-gen generates strongly-typed Cobra command source from an
 // OpenAPI 3.0/3.1 spec file. Intended for go:generate:
 //
-//	//go:generate go run github.com/d3servelabs/openapi-commands/cmd/oascmd-gen -spec api.yaml -package apicli -out zz_generated_commands.go
+//	//go:generate go run github.com/samishal1998/openapi-commands/cmd/oascmd-gen -spec api.yaml -package apicli -out zz_generated_commands.go
 //
 // It also maintains a lock file recording the generated CLI surface, so a
 // later run can report exactly what changed and refuse to silently break

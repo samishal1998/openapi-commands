@@ -15,7 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/d3servelabs/openapi-commands"
+	"github.com/samishal1998/openapi-commands"
 )
 
 func fixture(t *testing.T) []byte {

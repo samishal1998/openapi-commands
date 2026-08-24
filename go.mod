@@ -1,4 +1,4 @@
-module github.com/d3servelabs/openapi-commands
+module github.com/samishal1998/openapi-commands
 
 go 1.23.5
 

@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/d3servelabs/openapi-commands"
+	"github.com/samishal1998/openapi-commands"
 )
 
 // Version is the lock schema version. It is bumped when the on-disk shape

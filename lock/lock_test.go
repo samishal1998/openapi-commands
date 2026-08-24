@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d3servelabs/openapi-commands"
-	"github.com/d3servelabs/openapi-commands/lock"
+	"github.com/samishal1998/openapi-commands"
+	"github.com/samishal1998/openapi-commands/lock"
 )
 
 // baseModel is a small, complete operation used as the "before" side of the

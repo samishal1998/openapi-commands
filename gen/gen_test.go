@@ -16,10 +16,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/d3servelabs/openapi-commands"
-	"github.com/d3servelabs/openapi-commands/gen"
-	"github.com/d3servelabs/openapi-commands/gen/goldenpkg"
-	"github.com/d3servelabs/openapi-commands/lock"
+	"github.com/samishal1998/openapi-commands"
+	"github.com/samishal1998/openapi-commands/gen"
+	"github.com/samishal1998/openapi-commands/gen/goldenpkg"
+	"github.com/samishal1998/openapi-commands/lock"
 )
 
 const goldenPath = "goldenpkg/generated.go"
@@ -99,10 +99,10 @@ func TestGeneratedCompilesStandalone(t *testing.T) {
 	dir := t.TempDir()
 	goMod := "module tmpcheck\n\ngo 1.23.5\n\n" +
 		"require (\n" +
-		"\tgithub.com/d3servelabs/openapi-commands v0.0.0\n" +
+		"\tgithub.com/samishal1998/openapi-commands v0.0.0\n" +
 		"\tgithub.com/spf13/cobra v1.9.1\n" +
 		")\n\n" +
-		"replace github.com/d3servelabs/openapi-commands => " + repoRoot + "\n"
+		"replace github.com/samishal1998/openapi-commands => " + repoRoot + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
 		t.Fatal(err)
 	}
